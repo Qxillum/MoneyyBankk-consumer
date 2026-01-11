@@ -1,0 +1,10 @@
+com\example\errors\NotFoundMapper.class
+com\example\errors\InvalidCredentialsMapper.class
+com\example\resources\ConsumerResource.class
+com\example\Main.class
+com\example\config\Persistence.class
+com\example\interceptors\ResponseTimerInterceptor.class
+com\example\config\ApplicationConfig.class
+com\example\errors\InvalidPropertiesMapper.class
+com\example\messaging\Jms.class
+com\example\messaging\UserCreatedConsumer.class
