@@ -9,7 +9,8 @@ public class Main {
     public static void main(String[] args) throws Exception {
         GrizzlyHttpServerFactory.createHttpServer(URI.create(BASE_URI), new ApplicationConfig());
         System.out.println("Api server is starting on " + BASE_URI);
-        com.example.messaging.UserCreatedConsumer.start();
+        com.example.messaging.UserCreatedConsumer consumer = new com.example.messaging.UserCreatedConsumer();
+        consumer.start();
         Thread.currentThread().join();
     }
 }
