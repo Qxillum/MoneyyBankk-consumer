@@ -1,10 +1,13 @@
 package com.example.messaging;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.jms.*;
 
 public final class UserCreatedConsumer {
 
     private final InvalidMessageProducer invalidMessageProducer;
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     public UserCreatedConsumer() {
         this.invalidMessageProducer = new InvalidMessageProducer();
@@ -22,23 +25,27 @@ public final class UserCreatedConsumer {
             String payload = "";
             String correlationId = "<none>";
             try {
-                correlationId = msg.getJMSCorrelationID();
-                if (msg instanceof TextMessage tm) {
-                    payload = tm.getText();
-                } else {
-                    throw new IllegalArgumentException(
-                            "Expected TextMessage but got: " + msg.getClass().getSimpleName());
+                if (!(msg instanceof TextMessage tm)) {
+                    System.out.println("📥 Non-text JMS message: " + msg);
+                    return;
                 }
-                System.out.println("📥 Consumer received: " + payload);
-                System.out.println("    Verif= 1" + correlationId);
 
-                System.out.println(payload == null || payload.isBlank());
-                validatePayload(payload);
-                System.out.println("    Verif= 2" + correlationId);
+                String json = tm.getText();
+                JsonNode node = MAPPER.readTree(json);
+
+                Integer userId = node.hasNonNull("userId") ? node.get("userId").asInt() : null;
+                String timestamp = node.hasNonNull("timestamp") ? node.get("timestamp").asText() : null;
+                String nom = node.hasNonNull("nom") ? node.get("nom").asText() : null;
+                String prenom = node.hasNonNull("prenom") ? node.get("prenom").asText() : null;
+                String email = node.hasNonNull("email") ? node.get("email").asText() : null;
+
+                System.out.println("📥 USER_CREATED received -> userId=" + userId
+                        + ", timestamp=" + timestamp
+                        + ", nom=" + nom
+                        + ", prenom=" + prenom
+                        + ", email=" + email);
 
             } catch (Exception e) {
-                this.invalidMessageProducer.sendInvalidMessage("UserCreatedQueue", payload, e.getMessage());
-                System.out.println("🚫 Invalid message -> InvalidMessageQueue. Reason: " + e.getMessage());
                 e.printStackTrace();
             }
         });
