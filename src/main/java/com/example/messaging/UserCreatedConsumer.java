@@ -48,10 +48,10 @@ public final class UserCreatedConsumer {
                         + ", nom=" + nom
                         + ", prenom=" + prenom
                         + ", email=" + email);
-
+                msg.acknowledge();
             } catch (Exception e) {
                 String reason = e.getClass().getSimpleName() + ": " + e.getMessage();
-                invalidMessageProducer.sendInvalidMessage(sourceQueue, payload, reason);
+                this.invalidMessageProducer.sendInvalidMessage(sourceQueue, payload, reason);
                 try {
                     msg.acknowledge();
                 } catch (JMSException e1) {
@@ -72,6 +72,8 @@ public final class UserCreatedConsumer {
             throw new IllegalArgumentException("Missing field: timestamp");
         if (!node.hasNonNull("email"))
             throw new IllegalArgumentException("Missing field: email");
+        if (node.get("userId").asInt(-1) <= 0)
+            throw new IllegalArgumentException("Invalid userId");
 
         String email = node.get("email").asText();
         if (email.isBlank() || !email.contains("@"))
