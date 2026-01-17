@@ -1,32 +1,38 @@
 package com.example.messaging;
+
 import jakarta.jms.*;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class InvalidMessageProducer {
+
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
     public void sendInvalidMessage(String sourceQueue, String originalPayload, String errorReason) {
         ConnectionFactory factory = Jms.connectionFactory();
 
-        // Petit "enveloppe" JSON (simple, sans Jackson) pour garder l'info exploitable
-        String invalidPayload = "{"
-                + "\"sourceQueue\":\"" + escape(sourceQueue) + "\","
-                + "\"receivedAt\":\"" + Instant.now().toString() + "\","
-                + "\"errorReason\":\"" + escape(errorReason) + "\","
-                + "\"originalPayload\":\"" + escape(originalPayload) + "\""
-                + "}";
+        Map<String, Object> doc = new LinkedHashMap<>();
+        doc.put("sourceQueue", sourceQueue);
+        doc.put("receivedAt", Instant.now().toString()); // ISO-8601 UTC
+        doc.put("errorReason", errorReason);
+        doc.put("originalPayload", originalPayload);
 
-        try (JMSContext ctx = factory.createContext()) {
+        try (JMSContext ctx = factory.createContext(JMSContext.AUTO_ACKNOWLEDGE)) {
+            String json = MAPPER.writeValueAsString(doc);
+         
+
             Queue invalidQueue = ctx.createQueue("InvalidMessageQueue");
-            ctx.createProducer().send(invalidQueue, invalidPayload);
+            ctx.createProducer().send(invalidQueue, json);
 
-            System.out.println("🚫 Invalid message sent to InvalidMessageQueue: " + invalidPayload);
+            System.out.println("Invalid message sent to InvalidMessageQueue: " + json);
         }
-    }
-
-    // Evite de casser le JSON si le message contient des guillemets / backslashes.
-    private String escape(String s) {
-        if (s == null) return "";
-        return s.replace("\\", "\\\\").replace("\"", "\\\"");
+        catch (JsonProcessingException e) {
+                e.printStackTrace();
+            }
     }
 }

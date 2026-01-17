@@ -16,22 +16,26 @@ public final class UserCreatedConsumer {
     public void start() {
         ConnectionFactory factory = Jms.connectionFactory();
 
-        JMSContext ctx = factory.createContext();
+        JMSContext ctx = factory.createContext(JMSContext.CLIENT_ACKNOWLEDGE);
 
         Queue queue = ctx.createQueue("UserCreatedQueue");
         JMSConsumer consumer = ctx.createConsumer(queue);
 
         consumer.setMessageListener(msg -> {
+            String sourceQueue = "UserCreatedQueue";
             String payload = "";
-            String correlationId = "<none>";
             try {
                 if (!(msg instanceof TextMessage tm)) {
-                    System.out.println("📥 Non-text JMS message: " + msg);
+                    this.invalidMessageProducer.sendInvalidMessage(sourceQueue, String.valueOf(msg),
+                            "  Not a Text-Message");
+                    msg.acknowledge();
                     return;
                 }
 
-                String json = tm.getText();
-                JsonNode node = MAPPER.readTree(json);
+                payload = tm.getText();
+                JsonNode node = MAPPER.readTree(payload);
+
+                validateUserCreatedPayload(node);
 
                 Integer userId = node.hasNonNull("userId") ? node.get("userId").asInt() : null;
                 String timestamp = node.hasNonNull("timestamp") ? node.get("timestamp").asText() : null;
@@ -46,24 +50,31 @@ public final class UserCreatedConsumer {
                         + ", email=" + email);
 
             } catch (Exception e) {
-                e.printStackTrace();
+                String reason = e.getClass().getSimpleName() + ": " + e.getMessage();
+                invalidMessageProducer.sendInvalidMessage(sourceQueue, payload, reason);
+                try {
+                    msg.acknowledge();
+                } catch (JMSException e1) {
+                    e1.printStackTrace();
+                }
             }
         });
 
-        System.out.println("✅ Consumer listening on UserCreatedQueue");
+        System.out.println("Consumer listening on UserCreatedQueue");
     }
 
-    private static void validatePayload(String payload) {
-        if (payload == null || payload.isBlank()) {
-            throw new IllegalArgumentException("Payload is empty");
-        }
+    private static void validateUserCreatedPayload(JsonNode node) {
+        if (node == null)
+            throw new IllegalArgumentException("Body is null");
+        if (!node.hasNonNull("userId"))
+            throw new IllegalArgumentException("Missing field: userId");
+        if (!node.hasNonNull("timestamp"))
+            throw new IllegalArgumentException("Missing field: timestamp");
+        if (!node.hasNonNull("email"))
+            throw new IllegalArgumentException("Missing field: email");
 
-        // Exemple de règles: adapte à ton projet
-        boolean ok = payload.startsWith("UserCreated:") ||
-                payload.startsWith("Informations statistiques:");
-
-        if (!ok) {
-            throw new IllegalArgumentException("Unknown message format/prefix");
-        }
+        String email = node.get("email").asText();
+        if (email.isBlank() || !email.contains("@"))
+            throw new IllegalArgumentException("Invalid email");
     }
 }
