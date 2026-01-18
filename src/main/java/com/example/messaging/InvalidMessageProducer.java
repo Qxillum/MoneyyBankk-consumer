@@ -29,7 +29,7 @@ public class InvalidMessageProducer {
             Queue invalidQueue = ctx.createQueue("InvalidMessageQueue");
             ctx.createProducer().send(invalidQueue, json);
 
-            System.out.println("Invalid message sent to InvalidMessageQueue: " + json);
+            System.out.println("Invalid message sent to InvalidMessageQueue because " + errorReason);
         }
         catch (JsonProcessingException e) {
                 e.printStackTrace();

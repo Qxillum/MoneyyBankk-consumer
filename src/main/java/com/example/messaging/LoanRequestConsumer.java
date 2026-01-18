@@ -2,7 +2,7 @@ package com.example.messaging;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.example.exceptions.IllegalArgumentException ;
+import com.example.exceptions.IllegalArgumentException;
 import jakarta.jms.*;
 
 import java.time.Instant;
@@ -29,10 +29,8 @@ public final class LoanRequestConsumer {
             String json = "";
             try {
                 if (!(msg instanceof TextMessage tm)) {
-                    this.invalidMessageProducer.sendInvalidMessage(sourceQueue, String.valueOf(msg),
+                    throw new IllegalArgumentException(
                             "  Not a Text-Message");
-                    msg.acknowledge();
-                    return;
                 }
                 json = tm.getText();
                 JsonNode node = MAPPER.readTree(json);
@@ -74,9 +72,7 @@ public final class LoanRequestConsumer {
                     ctx.createProducer()
                             .send(replyTo, replyJson);
                 } else {
-                    this.invalidMessageProducer.sendInvalidMessage(
-                            sourceQueue,
-                            json,
+                    throw new IllegalArgumentException(
                             "Missing JMSReplyTo destination");
                 }
 
@@ -87,10 +83,19 @@ public final class LoanRequestConsumer {
                 String reason = e.getClass().getSimpleName() + ": " + e.getMessage();
                 this.invalidMessageProducer.sendInvalidMessage(sourceQueue, json, reason);
                 try {
+                    Destination replyTo = msg.getJMSReplyTo();
+                    if (replyTo != null) {
+                        Map<String, Object> err = new LinkedHashMap<>();
+                        err.put("type", "LOAN_DECISION_ERROR");
+                        err.put("error", true);
+                        err.put("reason", reason);
+                        String errJson = MAPPER.writeValueAsString(err);
+                        ctx.createProducer().send(replyTo, errJson);
+                    }
                     msg.acknowledge();
-                } catch (JMSException ex) {
-                    ex.printStackTrace();
-                }
+                } catch (Exception e1) {
+                    e1.printStackTrace();
+                } 
             }
         });
 
@@ -106,8 +111,6 @@ public final class LoanRequestConsumer {
             throw new IllegalArgumentException("Missing field: timestamp");
         if (!node.hasNonNull("email"))
             throw new IllegalArgumentException("Missing field: email");
-        if (node.get("requestId").asInt(-1) <= 0)
-            throw new IllegalArgumentException("Invalid requestId");
 
         String email = node.get("email").asText();
         if (email.isBlank() || !email.contains("@"))

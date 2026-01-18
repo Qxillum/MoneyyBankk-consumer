@@ -26,10 +26,8 @@ public final class UserCreatedConsumer {
             String payload = "";
             try {
                 if (!(msg instanceof TextMessage tm)) {
-                    this.invalidMessageProducer.sendInvalidMessage(sourceQueue, String.valueOf(msg),
+                    throw new IllegalArgumentException(
                             "  Not a Text-Message");
-                    msg.acknowledge();
-                    return;
                 }
 
                 payload = tm.getText();
